@@ -4,25 +4,20 @@ using UnityEngine.SceneManagement;
 namespace MapLightDataTool
 {
     /// <summary>
-    /// 씬에 배치하는 조명 적용 컴포넌트.
+    /// 씬에 배치하는 조명 등록 컴포넌트.
+    /// MapLightManager에 자신의 조명을 등록하고, 언로드 시 해제합니다.
     ///
-    /// 사용 방식:
-    /// - Primary 씬: Awake 시 해당 씬의 MapLightData를 자동 적용
-    /// - Additive 씬: 로드/언로드 시점에 맞춰 조명을 교체하거나 복원
-    /// - 런타임 교체: ApplyLightData()를 직접 호출 (낮/밤 전환 등)
+    /// Primary / Additive 구분은 컴포넌트가 속한 씬과
+    /// SceneManager.GetActiveScene()을 비교해 자동으로 판단합니다.
+    /// - Active 씬 == 이 컴포넌트의 씬  ->  Primary 등록
+    /// - Active 씬 != 이 컴포넌트의 씬  ->  Additive Push
     /// </summary>
     public class SceneLightController : MonoBehaviour
     {
-        [Header("Light Data")]
         [Tooltip("이 씬에서 사용할 MapLightData 에셋")]
         public MapLightData lightData;
 
-        [Header("Additive Scene")]
-        [Tooltip("Additive 씬 여부. true이면 언로드 시 previousLightData로 복원합니다.")]
-        public bool isAdditiveScene = false;
-
-        [Tooltip("Additive 씬 언로드 후 복원할 조명 데이터 (비워두면 복원하지 않음)")]
-        public MapLightData previousLightData;
+        private bool _isAdditive;
 
         // -----------------------------------------------------------------------
 
@@ -34,52 +29,32 @@ namespace MapLightDataTool
                 return;
             }
 
-            lightData.ApplyMapLightData();
+            // Active 씬과 비교해 Primary / Additive 자동 판단
+            _isAdditive = gameObject.scene != SceneManager.GetActiveScene();
+
+            if (_isAdditive)
+                MapLightManager.Instance.PushAdditive(lightData);
+            else
+                MapLightManager.Instance.RegisterPrimary(lightData);
         }
 
         private void OnDestroy()
         {
-            // Additive 씬이 언로드될 때 이전 조명으로 복원
-            if (isAdditiveScene && previousLightData != null)
-            {
-                // 씬이 언로드된 이후에도 RenderSettings 복원은 유효
-                previousLightData.ApplyMapLightData();
-            }
+            // Additive 씬 언로드 시 Manager에서 Pop -> 이전 조명 자동 복원
+            if (_isAdditive)
+                MapLightManager.Instance.PopAdditive(lightData);
         }
 
         // -----------------------------------------------------------------------
 
         /// <summary>
-        /// 런타임 중 조명을 교체합니다. (낮/밤 전환 등)
+        /// 런타임 중 이 씬의 조명을 교체합니다. (낮/밤 전환 등)
+        /// Manager의 현재 슬롯(Primary or Additive 최상단)을 함께 갱신합니다.
         /// </summary>
-        public void ApplyLightData(MapLightData data)
+        public void ApplyOverride(MapLightData data)
         {
-            if (data == null)
-            {
-                Debug.LogWarning("[SceneLightController] ApplyLightData: data가 null입니다.");
-                return;
-            }
-
             lightData = data;
-            data.ApplyMapLightData();
-        }
-
-        /// <summary>
-        /// 현재 씬에 배치된 SceneLightController를 찾아 조명을 교체합니다.
-        /// </summary>
-        public static void ApplyToScene(Scene scene, MapLightData data)
-        {
-            foreach (var root in scene.GetRootGameObjects())
-            {
-                var controller = root.GetComponentInChildren<SceneLightController>();
-                if (controller != null)
-                {
-                    controller.ApplyLightData(data);
-                    return;
-                }
-            }
-
-            Debug.LogWarning($"[SceneLightController] '{scene.name}'에서 SceneLightController를 찾을 수 없습니다.");
+            MapLightManager.Instance.ApplyOverride(data);
         }
     }
 }
