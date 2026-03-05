@@ -6,17 +6,24 @@ namespace MapLightDataTool
     /// <summary>
     /// 씬 조명 데이터를 중앙에서 관리하는 싱글톤 매니저.
     ///
-    /// 구조:
-    /// - Primary 조명: 현재 메인 씬의 기본 조명 (1개 유지)
-    /// - Additive 스택: Additive 씬이 쌓일수록 Push, 언로드 시 Pop
-    /// - 최상단 스택 조명이 항상 RenderSettings에 적용됨
+    /// 핵심 설계:
+    /// - Primary 슬롯: 현재 메인 씬의 기본 조명 (1개 유지)
+    /// - Additive 스택: Additive 씬이 로드될수록 Push, 언로드 시 Pop 후 자동 복원
+    /// - 적용 우선순위: Additive 스택 최상단 > Primary
     ///
-    /// 적용 우선순위: Additive 스택 최상단 > Primary
+    /// 진입점:
+    /// - RegisterPrimary()  Primary 씬 조명 등록
+    /// - PushAdditive()     Additive 씬 로드 시 스택 Push
+    /// - PopAdditive()      Additive 씬 언로드 시 스택 Pop + 이전 조명 자동 복원
+    /// - ApplyOverride()    런타임 중 현재 슬롯 교체 (낮/밤 전환 등)
     /// </summary>
     public class MapLightManager : MonoBehaviour
     {
         private static MapLightManager _instance;
 
+        /// <summary>
+        /// 싱글톤 인스턴스. 없으면 자동 생성합니다.
+        /// </summary>
         public static MapLightManager Instance
         {
             get
@@ -33,7 +40,10 @@ namespace MapLightDataTool
 
         // -----------------------------------------------------------------------
 
+        /// <summary>현재 메인 씬의 기본 조명</summary>
         private MapLightData _primaryLight;
+
+        /// <summary>Additive 씬 조명 스택. 최상단이 현재 적용 조명입니다.</summary>
         private readonly Stack<MapLightData> _additiveStack = new Stack<MapLightData>();
 
         // -----------------------------------------------------------------------
@@ -52,8 +62,8 @@ namespace MapLightDataTool
         // -----------------------------------------------------------------------
 
         /// <summary>
-        /// Primary 씬 조명을 등록하고 적용합니다.
-        /// Additive 스택이 비어 있을 때만 즉시 반영됩니다.
+        /// Primary 씬 조명을 등록합니다.
+        /// Additive 스택이 비어 있을 때만 즉시 RenderSettings에 반영됩니다.
         /// </summary>
         public void RegisterPrimary(MapLightData data)
         {
@@ -65,7 +75,6 @@ namespace MapLightDataTool
 
             _primaryLight = data;
 
-            // Additive 씬이 없을 때만 Primary를 바로 적용
             if (_additiveStack.Count == 0)
                 Apply(_primaryLight);
         }
@@ -86,17 +95,17 @@ namespace MapLightDataTool
         }
 
         /// <summary>
-        /// Additive 씬 언로드 시 스택에서 해당 조명을 제거하고
-        /// 이전 조명(스택 최상단 or Primary)으로 자동 복원합니다.
+        /// Additive 씬 언로드 시 스택에서 해당 조명을 제거합니다.
+        /// 제거 후 현재 최상단(또는 Primary)이 자동으로 복원됩니다.
         /// </summary>
         public void PopAdditive(MapLightData data)
         {
             if (_additiveStack.Count == 0)
                 return;
 
-            // 스택 최상단이 언로드 대상이면 바로 Pop
             if (_additiveStack.Peek() == data)
             {
+                // 최상단이 언로드 대상이면 바로 Pop
                 _additiveStack.Pop();
             }
             else
@@ -110,7 +119,7 @@ namespace MapLightDataTool
 
         /// <summary>
         /// 런타임 중 현재 조명을 임시로 교체합니다. (낮/밤 전환 등)
-        /// Primary이면 _primaryLight를, Additive이면 스택 최상단을 교체합니다.
+        /// Additive 스택이 있으면 최상단을, 없으면 Primary 슬롯을 교체합니다.
         /// </summary>
         public void ApplyOverride(MapLightData data)
         {
@@ -122,7 +131,6 @@ namespace MapLightDataTool
 
             if (_additiveStack.Count > 0)
             {
-                // 스택 최상단 교체
                 _additiveStack.Pop();
                 _additiveStack.Push(data);
             }
@@ -136,10 +144,11 @@ namespace MapLightDataTool
 
         // -----------------------------------------------------------------------
 
-        /// <summary>현재 적용되어야 할 조명 (Additive 최상단 or Primary)</summary>
+        /// <summary>현재 RenderSettings에 적용되어야 할 조명 (Additive 최상단 or Primary)</summary>
         public MapLightData Current =>
             _additiveStack.Count > 0 ? _additiveStack.Peek() : _primaryLight;
 
+        /// <summary>data를 RenderSettings에 적용합니다.</summary>
         private void Apply(MapLightData data)
         {
             if (data == null)
@@ -150,6 +159,10 @@ namespace MapLightDataTool
             data.ApplyMapLightData();
         }
 
+        /// <summary>
+        /// 스택에서 특정 데이터를 제거하고 재구성합니다.
+        /// Additive 씬이 중간 순서로 언로드되는 예외 케이스에서 호출됩니다.
+        /// </summary>
         private void RebuildStackWithout(MapLightData target)
         {
             var temp = new List<MapLightData>(_additiveStack);
