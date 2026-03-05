@@ -10,12 +10,16 @@ namespace MapLightDataTool
     /// - Primary 슬롯: 현재 메인 씬의 기본 조명 (1개 유지)
     /// - Additive 스택: Additive 씬이 로드될수록 Push, 언로드 시 Pop 후 자동 복원
     /// - 적용 우선순위: Additive 스택 최상단 > Primary
+    /// - SceneType 예약: 씬 로드 전 ReserveNextSceneType()으로 타입을 미리 지정하면
+    ///   SceneLightController.Awake에서 Inspector 설정 대신 예약 타입을 우선 사용
     ///
     /// 진입점:
-    /// - RegisterPrimary()  Primary 씬 조명 등록
-    /// - PushAdditive()     Additive 씬 로드 시 스택 Push
-    /// - PopAdditive()      Additive 씬 언로드 시 스택 Pop + 이전 조명 자동 복원
-    /// - ApplyOverride()    런타임 중 현재 슬롯 교체 (낮/밤 전환 등)
+    /// - RegisterPrimary()         Primary 씬 조명 등록
+    /// - PushAdditive()            Additive 씬 로드 시 스택 Push
+    /// - PopAdditive()             Additive 씬 언로드 시 스택 Pop + 이전 조명 자동 복원
+    /// - ApplyOverride()           런타임 중 현재 슬롯 교체 (낮/밤 전환 등)
+    /// - ReserveNextSceneType()    씬 로드 전 SceneType 예약
+    /// - ConsumeReservedType()     SceneLightController.Awake에서 예약 타입 소비
     /// </summary>
     public class MapLightManager : MonoBehaviour
     {
@@ -45,6 +49,13 @@ namespace MapLightDataTool
 
         /// <summary>Additive 씬 조명 스택. 최상단이 현재 적용 조명입니다.</summary>
         private readonly Stack<MapLightData> _additiveStack = new Stack<MapLightData>();
+
+        /// <summary>
+        /// 씬 이름 -> SceneType 예약 테이블.
+        /// ReserveNextSceneType()으로 등록, ConsumeReservedType()으로 소비(1회 사용 후 제거)됩니다.
+        /// </summary>
+        private readonly Dictionary<string, SceneLightController.SceneType> _reservedTypes
+            = new Dictionary<string, SceneLightController.SceneType>();
 
         // -----------------------------------------------------------------------
 
@@ -140,6 +151,35 @@ namespace MapLightDataTool
             }
 
             Apply(data);
+        }
+
+        // -----------------------------------------------------------------------
+
+        /// <summary>
+        /// 씬 로드 전 SceneType을 예약합니다.
+        /// SceneLightController.Awake에서 Inspector 설정 대신 이 값이 우선 적용됩니다.
+        /// </summary>
+        /// <param name="sceneName">로드할 씬 이름 (Path.GetFileNameWithoutExtension 기준)</param>
+        /// <param name="sceneType">Primary 또는 Additive</param>
+        public void ReserveNextSceneType(string sceneName, SceneLightController.SceneType sceneType)
+        {
+            _reservedTypes[sceneName] = sceneType;
+        }
+
+        /// <summary>
+        /// SceneLightController.Awake에서 호출됩니다.
+        /// 예약된 SceneType이 있으면 반환하고 테이블에서 제거합니다. (1회 소비)
+        /// 예약이 없으면 null을 반환해 Inspector 설정을 사용합니다.
+        /// </summary>
+        /// <param name="sceneName">이 컨트롤러가 속한 씬 이름</param>
+        public SceneLightController.SceneType? ConsumeReservedType(string sceneName)
+        {
+            if (_reservedTypes.TryGetValue(sceneName, out var reserved))
+            {
+                _reservedTypes.Remove(sceneName);
+                return reserved;
+            }
+            return null;
         }
 
         // -----------------------------------------------------------------------
