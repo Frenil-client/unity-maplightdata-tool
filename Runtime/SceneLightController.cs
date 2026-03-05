@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace MapLightDataTool
 {
@@ -7,17 +6,17 @@ namespace MapLightDataTool
     /// 씬에 배치하는 조명 등록 컴포넌트.
     /// MapLightManager에 자신의 조명을 등록하고, 언로드 시 해제합니다.
     ///
-    /// Primary / Additive 구분은 컴포넌트가 속한 씬과
-    /// SceneManager.GetActiveScene()을 비교해 자동으로 판단합니다.
-    /// - Active 씬 == 이 컴포넌트의 씬  ->  Primary 등록
-    /// - Active 씬 != 이 컴포넌트의 씬  ->  Additive Push
+    /// Primary / Additive 구분은 Inspector에서 명시적으로 지정합니다.
     /// </summary>
     public class SceneLightController : MonoBehaviour
     {
+        public enum SceneType { Primary, Additive }
+
+        [Tooltip("Primary: 메인 씬. Additive: 추가 로드되는 씬.")]
+        public SceneType sceneType = SceneType.Primary;
+
         [Tooltip("이 씬에서 사용할 MapLightData 에셋")]
         public MapLightData lightData;
-
-        private bool _isAdditive;
 
         // -----------------------------------------------------------------------
 
@@ -29,10 +28,7 @@ namespace MapLightDataTool
                 return;
             }
 
-            // Active 씬과 비교해 Primary / Additive 자동 판단
-            _isAdditive = gameObject.scene != SceneManager.GetActiveScene();
-
-            if (_isAdditive)
+            if (sceneType == SceneType.Additive)
                 MapLightManager.Instance.PushAdditive(lightData);
             else
                 MapLightManager.Instance.RegisterPrimary(lightData);
@@ -41,7 +37,7 @@ namespace MapLightDataTool
         private void OnDestroy()
         {
             // Additive 씬 언로드 시 Manager에서 Pop -> 이전 조명 자동 복원
-            if (_isAdditive)
+            if (sceneType == SceneType.Additive)
                 MapLightManager.Instance.PopAdditive(lightData);
         }
 
