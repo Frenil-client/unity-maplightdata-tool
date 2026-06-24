@@ -1,0 +1,29 @@
+{
+  "name": "com.frenil.maplight-data-tool",
+  "version": "1.0.0",
+  "displayName": "MapLightData Tool",
+  "description": "씬별 조명 환경(RenderSettings)을 ScriptableObject 로 캡처하고, Primary/Additive 씬 스택 기반으로 자동 적용·복원하는 시스템. Addressables 에디터 자동화 포함.",
+  "unity": "2021.2",
+  "keywords": [
+    "rendering",
+    "lighting",
+    "scene",
+    "addressables",
+    "editor-tool"
+  ],
+  "dependencies": {
+    "com.unity.addressables": "1.19.19"
+  },
+  "author": {
+    "name": "정휘현 (Frenil)",
+    "email": "silsen@naver.com",
+    "url": "https://github.com/Frenil-client"
+  },
+  "samples": [
+    {
+      "displayName": "MapLight Usage Example",
+      "description": "씬 전환 / Additive 로드 / 낮밤 전환 사용 예시",
+      "path": "Example"
+    }
+  ]
+}
