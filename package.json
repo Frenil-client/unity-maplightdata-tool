@@ -23,7 +23,7 @@
     {
       "displayName": "MapLight Usage Example",
       "description": "씬 전환 / Additive 로드 / 낮밤 전환 사용 예시",
-      "path": "Example"
+      "path": "Samples~/MapLightExample"
     }
   ]
 }

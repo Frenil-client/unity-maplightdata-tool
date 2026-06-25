@@ -193,6 +193,29 @@ Editor/
     └─ RegisterPrefabs()         Addressables 그룹 생성 및 에셋 등록
 ```
 
+## 설치
+
+### UPM (Package Manager) — 권장
+`Window ▸ Package Manager ▸ + ▸ Add package from git URL` 에 입력:
+
+```
+https://github.com/Frenil-client/unity-maplightdata-tool.git
+```
+
+또는 `Packages/manifest.json` 에 직접 추가:
+
+```json
+"com.frenil.maplight-data-tool": "https://github.com/Frenil-client/unity-maplightdata-tool.git"
+```
+
+> Addressables 의존(에디터 자동화). 프로젝트에 `com.unity.addressables` 가 있어야 합니다.
+
+### 드롭인
+`Runtime/`(+ 에디터 자동화가 필요하면 `Editor/`) 폴더를 프로젝트 `Assets/` 아래에 복사합니다.
+
+### 샘플
+Package Manager에서 이 패키지를 선택 → **Samples ▸ Import** (씬 전환/Additive/낮밤 전환 예시, 원본: `Samples~/MapLightExample`).
+
 ## 요구 사항
 
 - Unity 2021.2+ (C# 9.0)
