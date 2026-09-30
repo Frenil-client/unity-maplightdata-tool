@@ -3,14 +3,19 @@
 씬별 조명 환경을 ScriptableObject로 캡처하고, 씬 전환 및 Additive 씬 로드/언로드에 따라
 조명을 자동으로 적용하고 복원하는 시스템입니다.
 
+## 이 저장소에 대하여
+
+실무에서 다룬 씬 조명 저장·복원 문제를 바탕으로 개인이 새로 구현한 공개 예시입니다.
+회사 원본 코드가 아닙니다.
+
 ## 개요
 
 Unity의 `RenderSettings`(Skybox, Ambient, Fog, Flare 등)를 `MapLightData`(ScriptableObject)로
 저장하고, `MapLightManager`가 Primary / Additive 씬 스택을 중앙에서 관리합니다.
 
-각 씬에 배치된 `SceneLightController`가 Awake / OnDestroy 시점에 Manager에
-자동으로 등록/해제하며, Primary인지 Additive인지는 `SceneManager.GetActiveScene()`과
-비교해 자동으로 판단합니다.
+각 씬의 `SceneLightController`가 Awake에서 조명을 등록하고, Additive 씬은 OnDestroy에서 해제합니다.
+씬 타입은 `ReserveNextSceneType()`으로 예약한 값이 우선이며, 예약이 없으면 Inspector의 `sceneType`을 사용합니다.
+활성 씬을 비교해 자동 판별하지는 않습니다.
 
 ## 구조
 
@@ -62,7 +67,7 @@ if (_resolvedType == SceneType.Additive)
     MapLightManager.Instance.PopAdditive(lightData);
 ```
 
-### 3. MapLightData - RenderSettings 전체 캡처
+### 3. MapLightData - 지원하는 RenderSettings 항목 캡처
 
 캡처 항목:
 
@@ -92,7 +97,9 @@ public void ApplyMapLightData()
 ### 4. SceneInvalidCheckTool - 에디터 자동화
 
 `Tools > MapLightData > Scene Variable Editor` 메뉴로 EditorWindow를 열고,
-버튼 하나로 씬 디렉토리 전체를 순회하며 아래 작업을 자동 수행합니다.
+버튼으로 지정 경로의 `BG_` 접두사 씬을 순회하며 아래 작업을 수행합니다.
+현재 입력 경로는 `Assets/Game/RemoteResources/Scene`, 출력 경로는 그 아래
+`ScriptableObject/MapLightData`로 코드에 고정되어 있습니다. 다른 프로젝트에서는 경로와 필터를 수정해야 합니다.
 
 ```
 1. 지정 디렉토리에서 씬 목록 수집
@@ -117,7 +124,8 @@ public void ApplyMapLightData()
 
 ### 2. 씬 전환 - ReserveNextSceneType
 
-씬 로드 전 반드시 `ReserveNextSceneType()`을 먼저 호출합니다.
+Inspector 설정과 다른 타입으로 로드할 때는 `ReserveNextSceneType()`을 먼저 호출합니다.
+예약을 생략하면 컨트롤러에 저장된 `sceneType`을 사용합니다.
 씬이 로드되면 `SceneLightController.Awake`에서 예약 타입을 자동으로 소비합니다.
 
 ```csharp
@@ -152,10 +160,8 @@ SceneManager.UnloadSceneAsync("DungeonScene");
 ### 4. 런타임 중 교체 (낮/밤 전환 등)
 
 ```csharp
-// Manager 직접 호출
-MapLightManager.Instance.ApplyOverride(nightLightData);
-
-// 또는 SceneLightController를 통해 호출
+// 현재 적용 중인 최상단 씬의 컨트롤러를 통해 교체합니다.
+// 컨트롤러의 lightData와 매니저 슬롯을 함께 갱신합니다.
 sceneLightController.ApplyOverride(nightLightData);
 ```
 
@@ -184,7 +190,7 @@ Runtime/
     ├─ Awake()                   예약 타입 우선 소비 후 Manager에 등록
     ├─ OnDestroy()               Additive 씬 언로드 시 Manager에서 Pop
     └─ ApplyOverride()           런타임 중 조명 교체 요청
-Example/
+Samples~/MapLightExample/
 └─ MapLightExample.cs            씬 전환 / Additive 로드 / 낮밤 전환 사용 예시
 Editor/
 └─ SceneInvalidCheckTool.cs
@@ -192,6 +198,31 @@ Editor/
     ├─ UpdateBGAddressable()     씬 순회 -> 에셋 생성 -> Addressables 등록
     └─ RegisterPrefabs()         Addressables 그룹 생성 및 에셋 등록
 ```
+
+## 현재 제약
+
+### 조명 교체와 씬 해제
+
+스택은 씬 식별자 대신 `MapLightData` 참조로 항목을 구분합니다.
+Additive 씬이 Day로 등록된 뒤 `MapLightManager.ApplyOverride(Night)`를 직접 부르면
+컨트롤러에는 Day가 남습니다. 이후 씬이 종료되어 `PopAdditive(Day)`를 호출해도
+스택의 Night를 찾지 못해 이전 조명이 복원되지 않을 수 있습니다.
+
+현재 적용 중인 씬은 컨트롤러의 `ApplyOverride`를 사용해야 합니다.
+다만 아래쪽 씬을 지정해 교체하거나 여러 씬이 같은 조명 에셋을 공유하는 경우까지 안전하게 처리하는 구조는 아닙니다.
+등록 핸들 또는 씬 식별자로 소유권을 구분하고, 교체·해제를 같은 항목에 수행하는 개선이 필요합니다.
+
+### 에디터 일괄 처리
+
+성공 경로에서는 작업 전 활성 씬을 다시 엽니다. 예외 발생 시의 복원과
+여러 Additive 씬을 열어 둔 편집 상태 전체의 복원은 구현되어 있지 않습니다.
+실행 전 작업을 저장하고, 입력·출력 경로와 기존 에셋을 확인합니다.
+
+## 다음 검증 항목
+
+- 씬 등록 핸들을 도입한 뒤 최상단·중간 씬 해제, 동일 에셋 공유, 낮밤 교체 후 해제를 테스트한다.
+- 에디터 경로·접두사를 설정 가능하게 하고, 기존 에셋 갱신과 예외 시 씬 구성 복원을 보강한다.
+- 현재 자동 테스트·CI 구성은 없으며, 씬 전환과 RenderSettings 적용은 Unity에서 확인해야 한다.
 
 ## 설치
 
