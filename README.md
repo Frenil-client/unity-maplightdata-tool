@@ -224,30 +224,7 @@ Additive 씬이 Day로 등록된 뒤 `MapLightManager.ApplyOverride(Night)`를 �
 - 에디터 경로·접두사를 설정 가능하게 하고, 기존 에셋 갱신과 예외 시 씬 구성 복원을 보강한다.
 - 현재 자동 테스트·CI 구성은 없으며, 씬 전환과 RenderSettings 적용은 Unity에서 확인해야 한다.
 
-## 설치
-
-### UPM (Package Manager) — 권장
-`Window ▸ Package Manager ▸ + ▸ Add package from git URL` 에 입력:
-
-```
-https://github.com/Frenil-client/unity-maplightdata-tool.git
-```
-
-또는 `Packages/manifest.json` 에 직접 추가:
-
-```json
-"com.frenil.maplight-data-tool": "https://github.com/Frenil-client/unity-maplightdata-tool.git"
-```
-
-> Addressables 의존(에디터 자동화). 프로젝트에 `com.unity.addressables` 가 있어야 합니다.
-
-### 드롭인
-`Runtime/`(+ 에디터 자동화가 필요하면 `Editor/`) 폴더를 프로젝트 `Assets/` 아래에 복사합니다.
-
-### 샘플
-Package Manager에서 이 패키지를 선택 → **Samples ▸ Import** (씬 전환/Additive/낮밤 전환 예시, 원본: `Samples~/MapLightExample`).
-
-## 요구 사항
+## 개발 환경
 
 - Unity 2021.2+ (C# 9.0)
-- Addressables 패키지
+- Addressables 패키지 (에디터 자동화)
