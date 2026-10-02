@@ -190,7 +190,7 @@ Runtime/
     ├─ Awake()                   예약 타입 우선 소비 후 Manager에 등록
     ├─ OnDestroy()               Additive 씬 언로드 시 Manager에서 Pop
     └─ ApplyOverride()           런타임 중 조명 교체 요청
-Samples~/MapLightExample/
+Example/
 └─ MapLightExample.cs            씬 전환 / Additive 로드 / 낮밤 전환 사용 예시
 Editor/
 └─ SceneInvalidCheckTool.cs
